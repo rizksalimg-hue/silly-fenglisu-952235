@@ -28,7 +28,7 @@ button{font:inherit;font-weight:bold;border:0;border-radius:12px;padding:13px 22
 <label>اسم ولي الأمر *<input id="nm" maxlength="60" autocomplete="name"></label><label>رقم الجوال *<input id="ph" inputmode="tel" maxlength="20" autocomplete="tel"></label><label>اسم الطالب/ـة *<input id="st" maxlength="60"></label>
 <label>الصف *<select id="gr"><option value="">اختر</option><option>الأول الابتدائي</option><option>الثاني الابتدائي</option><option>الثالث الابتدائي</option><option>الرابع الابتدائي</option><option>الخامس الابتدائي</option><option>السادس الابتدائي</option><option>أكثر من طالب</option></select></label>
 <p class="i" style="font-size:13px">تُستخدم بياناتك لتنظيم المسابقة والقرعة فقط، ولا تُعرض الجوالات علنًا.</p>
-<button id="go">ابدأ ←</button><div class="msg" id="rm"></div></section>
+<button id="go">ابدأ ←</button><div class="msg" id="rm"></div><div id="ver" style="margin-top:14px;font-size:12px;color:#8a9aa8;text-align:center">إصدار الصفحة 9</div></section>
 <section id="spin" class="card hid"><h2>اكتشف محورك التربوي</h2><div class="wr"><div class="ptr"></div><canvas id="w1" width="640" height="640"></canvas></div><button id="sp">🎯 أدِر القرص</button></section>
 <section id="quiz" class="card hid"><span class="chip" id="tp"></span><div class="bar"><i id="pb"></i></div><div class="q" id="qt"></div><div id="an"></div><div class="fb" id="fb"></div><button id="nx" class="hid">التالي</button></section>
 <section id="done" class="card hid"><div class="big" id="de"></div><h2 id="dt"></h2><p class="i" id="dc"></p><button id="again" class="y hid">🔁 محاولة أخرى بمحور آخر</button><div class="msg" id="am"></div></section>
@@ -62,7 +62,7 @@ if(!nm||!st||!gr||ph.length<9){$('rm').textContent='يرجى استكمال ال
 if(API.startsWith('PASTE')){$('rm').textContent='لم يُربط الرابط السحابي بعد.';return}
 $('go').disabled=true;$('rm').textContent='جارٍ التحقق…';
 let r;try{r=await api({action:'start',name:nm,phone:ph,student:st,grade:gr})}catch(e){$('rm').textContent=why(e);$('go').disabled=false;console.warn(e);return}
-if(!r.ok){$('rm').textContent=r.err==='dup'?'وصلت إلى الحد الأقصى من المحاولات المسموحة. شكرًا لحماسك!':'تعذر التسجيل، تحقق من البيانات وحاول مجددًا.';$('go').disabled=false;return}
+if(!r.ok){$('rm').textContent=r.err==='dup'?'وصلت إلى الحد الأقصى من المحاولات المسموحة. شكرًا لحماسك!':(r.err==='server'?'خطأ في خادم المسابقة (R4): '+(r.msg||'')+' — أبلغ المنظّم.':'تعذر التسجيل، تحقق من البيانات وحاول مجددًا.');$('go').disabled=false;return}
 try{me={name:nm,phone:ph,student:st,grade:gr};att=r.attempt||1;played=r.played||[];qualified=!!r.qualified;$('rm').textContent='';beginSpin()}
 catch(e){$('rm').textContent='خطأ في الصفحة (R0). حدّث الصفحة وحاول مجددًا.';$('go').disabled=false;console.error(e)}};
 
@@ -80,7 +80,7 @@ $('again').classList.remove('hid');show('done');if(pass&&!was)confetti()};
 $('again').onclick=async()=>{$('again').disabled=true;$('am').textContent='';
 let r;try{r=await api({action:'start',name:me.name,phone:me.phone,student:me.student,grade:me.grade})}catch(e){$('am').textContent=why(e);$('again').disabled=false;return}
 if(r.ok){try{att=r.attempt||att+1;qualified=qualified||!!r.qualified;played=[...new Set([...(r.played||[]),...played])];beginSpin()}catch(e){$('am').textContent='خطأ في الصفحة (R0). حدّث الصفحة.';console.error(e)}}
-else $('am').textContent=r.err==='dup'?'وصلت إلى الحد الأقصى من المحاولات المسموحة. شكرًا لحماسك!':'تعذر بدء محاولة جديدة، حاول مجددًا.';
+else $('am').textContent=r.err==='dup'?'وصلت إلى الحد الأقصى من المحاولات المسموحة. شكرًا لحماسك!':(r.err==='server'?'خطأ في خادم المسابقة (R4): '+(r.msg||'')+' — أبلغ المنظّم.':'تعذر بدء محاولة جديدة، حاول مجددًا.');
 $('again').disabled=false};
 // ===== شاشة المشرف: ?admin=الرمز =====
 const key=new URLSearchParams(location.search).get('admin');
