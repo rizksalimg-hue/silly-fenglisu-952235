@@ -40,7 +40,14 @@ const T=[{"name": "الحوار الأسري", "color": "#287ca5", "questions": 
 const $=i=>document.getElementById(i),show=i=>['reg','spin','quiz','done','draw'].forEach(x=>$(x).classList.toggle('hid',x!==i));
 const P=Math.PI*2,rnd=n=>crypto.getRandomValues(new Uint32Array(1))[0]%n;
 const digits=s=>String(s).replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\D/g,'');
-async function api(o){const r=await fetch(API+'?'+new URLSearchParams(o).toString());return r.json()}
+// اتصال بالخادم مع مهلة وإعادة محاولة، ورمز واضح لسبب الفشل: R1 استجابة غير JSON، R2 انتهاء المهلة، R3 تعذر الوصول للشبكة
+async function api(o){const url=API+'?'+new URLSearchParams(o).toString();let err;
+ for(let k=0;k<2;k++){const ac=new AbortController(),t=setTimeout(()=>ac.abort(),15000);
+  try{const r=await fetch(url,{signal:ac.signal}),tx=await r.text();clearTimeout(t);
+   try{return JSON.parse(tx)}catch(_){const e=new Error('bad response');e.code='R1';e.status=r.status;throw e}}
+  catch(e){clearTimeout(t);err=e.code?e:Object.assign(e,{code:e.name==='AbortError'?'R2':'R3'});if(err.code==='R1')break;await new Promise(s=>setTimeout(s,800))}}
+ throw err}
+const why=e=>({R1:'استجابة غير متوقعة من خادم المسابقة',R2:'انتهت مهلة الاتصال بخادم المسابقة',R3:'تعذر الوصول إلى خادم المسابقة'}[e&&e.code]||'حدث خطأ غير متوقع')+' ('+((e&&e.code)||'R0')+'). '+((e&&e.code)==='R3'?'جرّب الاتصال ببيانات الجوال بدل الواي فاي ثم أعد المحاولة.':'أعد المحاولة، وإن تكرر فأبلغ المنظّم.');
 function paint(cv,L,C,rot,fs){const w=cv.width,c=w/2,r=c-8,n=L.length,a=P/n,x=cv.getContext('2d');x.clearRect(0,0,w,w);
 L.forEach((t,i)=>{const s=rot+i*a-Math.PI/2;x.beginPath();x.moveTo(c,c);x.arc(c,c,r,s,s+a);x.closePath();x.fillStyle=C[i%C.length];x.fill();x.strokeStyle='#fff';x.lineWidth=3;x.stroke();
 if(n<=80){x.save();x.translate(c,c);x.rotate(s+a/2);const m=(((s+a/2)%P)+P)%P,fl=m>Math.PI/2&&m<3*Math.PI/2;x.textBaseline='middle';x.fillStyle='#fff';x.font='bold '+fs+'px Tahoma,Arial';if(fl){x.rotate(Math.PI);x.textAlign='left';x.fillText(t,-(r-16),0,r*.62)}else{x.textAlign='right';x.fillText(t,r-16,0,r*.62)}x.restore()}});
@@ -54,10 +61,11 @@ $('go').onclick=async()=>{const nm=$('nm').value.trim(),ph=digits($('ph').value)
 if(!nm||!st||!gr||ph.length<9){$('rm').textContent='يرجى استكمال البيانات بشكل صحيح.';return}
 if(API.startsWith('PASTE')){$('rm').textContent='لم يُربط الرابط السحابي بعد.';return}
 $('go').disabled=true;$('rm').textContent='جارٍ التحقق…';
-try{const r=await api({action:'start',name:nm,phone:ph,student:st,grade:gr});
-if(!r.ok){$('rm').textContent=r.err==='dup'?'وصلت إلى الحد الأقصى من المحاولات المسموحة. شكرًا لحماسك!':'تعذر التسجيل، حاول مجددًا.';$('go').disabled=false;return}
-me={name:nm,phone:ph,student:st,grade:gr};att=r.attempt||1;played=r.played||[];qualified=!!r.qualified;$('rm').textContent='';beginSpin()}
-catch(e){$('rm').textContent='تعذر الاتصال بالإنترنت. حاول مجددًا.';$('go').disabled=false}};
+let r;try{r=await api({action:'start',name:nm,phone:ph,student:st,grade:gr})}catch(e){$('rm').textContent=why(e);$('go').disabled=false;console.warn(e);return}
+if(!r.ok){$('rm').textContent=r.err==='dup'?'وصلت إلى الحد الأقصى من المحاولات المسموحة. شكرًا لحماسك!':'تعذر التسجيل، تحقق من البيانات وحاول مجددًا.';$('go').disabled=false;return}
+try{me={name:nm,phone:ph,student:st,grade:gr};att=r.attempt||1;played=r.played||[];qualified=!!r.qualified;$('rm').textContent='';beginSpin()}
+catch(e){$('rm').textContent='خطأ في الصفحة (R0). حدّث الصفحة وحاول مجددًا.';$('go').disabled=false;console.error(e)}};
+
 function beginSpin(){avail=T.filter(t=>!played.includes(t.name));if(!avail.length){played=[];avail=T}qi=0;sc=0;$('sp').disabled=false;$('w1')._r=0;show('spin');paint($('w1'),avail.map(t=>t.name),avail.map(t=>t.color),0,30)}
 $('sp').onclick=()=>{$('sp').disabled=true;spin($('w1'),avail.map(t=>t.name),avail.map(t=>t.color),30,i=>{topic=avail[i];qs=topic.questions.map(q=>{const o=q.a.map((t,k)=>({t,ok:k===q.c}));for(let k=o.length-1;k>0;k--){const j=rnd(k+1);[o[k],o[j]]=[o[j],o[k]]}return{q:q.q,o,why:q.why}});setTimeout(()=>{show('quiz');ask()},900)})};
 function ask(){lock=false;const q=qs[qi];$('tp').textContent='المحور: '+topic.name;$('pb').style.width=(qi/5*100)+'%';$('qt').textContent=(qi+1)+'/5 — '+q.q;$('fb').textContent='';$('nx').classList.add('hid');$('nx').disabled=false;
@@ -69,7 +77,11 @@ $('de').textContent=qualified?'🌟':'🌱';$('dt').textContent=qualified?'أح�
 const msg=pass?(was?'أحسنت! تأهلك للقرعة قائم من محاولتك الناجحة الأولى، وهذه المحاولة للاستفادة فقط.':'أصبحت مؤهلًا للقرعة الختامية، ترقّب السحب على الشاشة!'):(was?'تأهلك للقرعة قائم من محاولتك الناجحة السابقة.':'تحتاج 3 إجابات صحيحة للتأهل.');
 $('dc').textContent='نتيجتك: '+sc+' من 5. '+msg+' يمكنك المحاولة مرة أخرى بمحور مختلف لتستفيد أكثر.'+(saved?'':' ⚠️ تعذر حفظ نتيجتك بسبب الاتصال، يرجى إبلاغ المنظّم.');
 $('again').classList.remove('hid');show('done');if(pass&&!was)confetti()};
-$('again').onclick=async()=>{$('again').disabled=true;$('am').textContent='';try{const r=await api({action:'start',name:me.name,phone:me.phone,student:me.student,grade:me.grade});if(r.ok){att=r.attempt||att+1;qualified=qualified||!!r.qualified;played=[...new Set([...(r.played||[]),...played])];beginSpin()}else $('am').textContent='تعذر بدء محاولة جديدة، حاول مجددًا.'}catch(e){$('am').textContent='تعذر الاتصال بالإنترنت. حاول مجددًا.'}$('again').disabled=false};
+$('again').onclick=async()=>{$('again').disabled=true;$('am').textContent='';
+let r;try{r=await api({action:'start',name:me.name,phone:me.phone,student:me.student,grade:me.grade})}catch(e){$('am').textContent=why(e);$('again').disabled=false;return}
+if(r.ok){try{att=r.attempt||att+1;qualified=qualified||!!r.qualified;played=[...new Set([...(r.played||[]),...played])];beginSpin()}catch(e){$('am').textContent='خطأ في الصفحة (R0). حدّث الصفحة.';console.error(e)}}
+else $('am').textContent=r.err==='dup'?'وصلت إلى الحد الأقصى من المحاولات المسموحة. شكرًا لحماسك!':'تعذر بدء محاولة جديدة، حاول مجددًا.';
+$('again').disabled=false};
 // ===== شاشة المشرف: ?admin=الرمز =====
 const key=new URLSearchParams(location.search).get('admin');
 if(key){show('draw');let pool=[],won=new Set();const C=['#287ca5','#39956f','#d49a2e','#9a6bb0','#d56f56','#367f87','#bd7b36','#5576a8'];
